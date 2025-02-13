@@ -28,7 +28,7 @@ public class RegisterController {
 
     @GetMapping("/test")
     public String test(){
-        return "Welcome to Bookstore Application!";
+        return "Welcome to Bookstore Application 12345!";
     }
     @GetMapping("/testing")
     public String test2(){
