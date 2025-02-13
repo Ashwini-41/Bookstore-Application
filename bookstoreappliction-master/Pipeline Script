@@ -1,0 +1,88 @@
+pipeline {
+    agent any
+    
+    environment{
+        DIR = "/home/ubuntu/Bookstore-Application"
+    }
+
+    stages {
+        stage('Git Checkout') {
+            steps {
+                cleanWs()
+                git branch: 'main', url: 'https://github.com/Ashwini-41/Bookstore-Application'
+                sh 'git pull origin main'
+            }
+        }
+        
+        stage('Copy Files') {
+            steps {
+                sh '''
+                rsync -avz -e "ssh -o StrictHostKeyChecking=no" \$(pwd)/ ubuntu@172.31.12.167:${DIR}
+                    
+                '''
+            }
+        }
+
+        stage('Build Stage') {
+            steps {
+                sh 'cd bookstoreappliction-master && mvn clean install -U'
+            }
+        }
+
+        stage('Stop Old Service') {
+            steps {
+                sh '''
+                ssh -o StrictHostKeyChecking=no ubuntu@172.31.12.167 '
+                    sudo systemctl stop bookstore.service || true
+                '
+                '''
+            }
+        }
+
+        stage('Delete Old Artifacts') {
+            steps {
+                sh '''
+                ssh -o StrictHostKeyChecking=no ubuntu@172.31.12.167 '
+                    sudo rm -rf /home/ubuntu/Bookstore-Application/bookstoreappliction-master/target/*.jar
+                    ls -l /home/ubuntu/Bookstore-Application/bookstoreappliction-master/target/
+                '
+                '''
+            }
+        }
+
+        stage('Ensure Target Directory Exists') {
+            steps {
+                sh '''
+                ssh -o StrictHostKeyChecking=no ubuntu@172.31.12.167 '
+                    mkdir -p /home/ubuntu/Bookstore-Application/bookstoreappliction-master/target/
+                '
+                '''
+            }
+        }
+
+        stage('Copy New Artifact') {
+            steps {
+                sh '''
+                scp -o StrictHostKeyChecking=no \
+                /var/lib/jenkins/workspace/bookstore/bookstoreappliction-master/target/bookstoreappliction-0.0.1-SNAPSHOT.jar \
+                ubuntu@172.31.12.167:/home/ubuntu/Bookstore-Application/bookstoreappliction-master/target/
+                '''
+            }
+        }
+
+        stage('Enable and Start New Service') {
+            steps {
+                sh '''
+                ssh -o StrictHostKeyChecking=no ubuntu@172.31.12.167 '
+                    sudo systemctl daemon-reload
+                    sudo systemctl stop bookstore.service
+                    sudo systemctl start bookstore.service
+                    sudo systemctl status bookstore.service
+                '
+                '''
+            }
+        }
+
+        
+    }
+}
